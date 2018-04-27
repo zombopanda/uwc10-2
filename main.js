@@ -1,0 +1,1 @@
+Interpreter.run(document.getElementById('code').innerHTML);

@@ -1,0 +1,209 @@
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>UWC Pseudocode WebRTC Demo</title>
+  <link rel="stylesheet" href="main.css"/>
+</head>
+<body>
+<div id="signaling">
+  <div id="show-local-offer">
+    <h3>Send your local offer to someone else</h3>
+    <textarea id="local-offer" rows="10" cols="100"></textarea>
+    <div>
+      <button id="offer-sent-btn">Ok</button>
+    </div>
+  </div>
+
+  <div id="show-local-answer">
+    <h3>Send your local answer to someone else</h3>
+    <textarea id="local-answer" rows="10" cols="100"></textarea>
+    <div>
+      <button id="answer-sent-btn">Ok</button>
+    </div>
+  </div>
+
+  <div id="get-remote-offer">
+    <h3>Paste the "offer" you received</h3>
+    <textarea id="remote-offer" rows="10" cols="100"></textarea>
+    <div>
+      <button id="offer-received-btn">Ok</button>
+    </div>
+  </div>
+
+  <div id="get-remote-answer">
+    <h3>Paste the "answer" you received</h3>
+    <textarea id="remote-answer" rows="10" cols="100"></textarea>
+    <div>
+      <button id="answer-received-btn">Ok</button>
+    </div>
+  </div>
+
+  <div id="wait-for-connection">
+    <h3>Waiting for connection</h3>
+    <div class="spinner"><img src="spinner.gif"/></div>
+  </div>
+
+  <div id="create-or-join">
+    <h3>Create or join a room?</h3>
+    <button id="join-btn">Join</button>
+    <button id="create-btn">Create</button>
+  </div>
+</div>
+
+<div id="chat" style="display: none">
+  <div id="messages"></div>
+
+  <form id="chat-form">
+    <input type="text" id="message-text" placeholder="Type your message">
+    <button type="submit" id="send-message">Send</button>
+  </form>
+</div>
+<script type="text/uwc" id="code">
+(hash "iceServers" (array (hash "urls" (array ("stun:23.21.150.121")))))
+
+(define (encodeSession data) (btoa (JSON.stringify data)))
+(define (decodeSession data) (JSON.parse (atob data)))
+
+(define (showStep id) (
+  (map (document.querySelectorAll "#signaling > div") (setPropertyStyle e "display" "none"))
+  (setPropertyStyle (document.getElementById id) "display" "block")
+))
+
+(var (cfg) (hash "iceServers" (array (hash "urls" (array ("stun:23.21.150.121"))))))
+
+(global (pc1) (RTCPeerConnection cfg))
+(global (dc1) (true))
+(global (activedc) (true))
+
+(showStep "create-or-join")
+
+
+(addEventListener (document.getElementById "create-btn") "click" (
+  (showStep "show-local-offer")
+  (createLocalOffer)
+))
+
+(addEventListener (document.getElementById "join-btn") "click" (
+  (showStep "get-remote-offer")
+))
+
+(addEventListener (document.getElementById "offer-sent-btn") "click" (
+  (showStep "get-remote-answer")
+))
+
+(addEventListener (document.getElementById "offer-received-btn") "click" (
+  (handleOfferFromPC1 (RTCSessionDescription (decodeSession (getProperty (document.getElementById "remote-offer") "value"))))
+  (showStep "show-local-answer")
+))
+
+(addEventListener (document.getElementById "answer-sent-btn") "click" (
+  (showStep "wait-for-connection")
+))
+
+(addEventListener (document.getElementById "answer-received-btn") "click" (
+  (handleAnswerFromPC2 (RTCSessionDescription (decodeSession (getProperty (document.getElementById "remote-answer") "value"))))
+  (showStep "wait-for-connection")
+))
+
+(addEventListener (document.getElementById "chat-form") "submit" (
+  (var (messageTextBox) (document.getElementById "message-text"))
+  (document.getElementById "message-text")
+  (e.preventDefault)
+
+  (if (getProperty messageTextBox "value") (
+    (writeChat (getProperty messageTextBox "value") "text-green")
+    (activedc.send (JSON.stringify (hash "message" (getProperty messageTextBox "value"))))
+    (setProperty messageTextBox "value" "")
+    (var (messagesEl) (document.getElementById "messages"))
+    (setProperty messagesEl "scrollTop" (getProperty messagesEl "scrollHeight"))
+  ))
+  (false)
+))
+
+(define (setupDCEvents dc) (
+  (addEventListener dc "open" (
+    (setPropertyStyle (document.querySelector "#signaling") "display" "none")
+    (setPropertyStyle (document.querySelector "#chat") "display" "block")
+  ))
+  (addEventListener dc "message" (
+    (var (data) (JSON.parse (getProperty e "data")))
+
+    (writeChat (getProperty data "message") "text-blue")
+    (var (messagesEl) (document.getElementById "messages"))
+    (setProperty messagesEl "scrollTop" (getProperty messagesEl "scrollHeight"))
+  ))
+))
+
+(define (setupDC1) (
+  (global (dc1) (pc1.createDataChannel "test" (hash "reliable" (true))))
+  (global (activedc) dc1)
+  (setupDCEvents dc1)
+))
+
+(define (createLocalOffer) (
+  (setupDC1)
+  (pc1.createOffer (fn (pc1.setLocalDescription a (fn ((true))) (fn ((true))))) (fn (console.warn "Couldn't create offer")))
+))
+
+(addEventListener pc1 "icecandidate" (
+  (if (= (getProperty e "candidate") (null)) (
+    (setProperty (document.getElementById "local-offer") "innerHTML" (encodeSession (getProperty pc1 "localDescription")))
+  ))
+))
+
+(define (handleOnconnection) (
+  (call (document.getElementById "message-text") "focus")
+  (setPropertyStyle (document.querySelector "#signaling") "display" "none")
+  (setPropertyStyle (document.querySelector "#chat") "display" "block")
+))
+
+(addEventListener pc1 "connection" (handleOnconnection))
+
+(define (handleAnswerFromPC2 answerDesc) (
+  (pc1.setRemoteDescription answerDesc)
+))
+
+(global (pc2) (RTCPeerConnection cfg))
+(global (dc2) (true))
+
+(addEventListener pc2 "datachannel" (
+  (var (dc2) (if (getProperty e "channel") (getProperty e "channel") e))
+  (var (activedc) dc2)
+  (setupDCEvents dc2)
+))
+
+(define (handleOfferFromPC1 offerDesc) (
+  (pc2.setRemoteDescription offerDesc)
+  (pc2.createAnswer (fn (pc2.setLocalDescription a (fn ((true))) (fn ((true))))) (fn (console.warn "Couldn't create offer")))
+))
+
+(addEventListener pc2 "icecandidate" (
+  (if (= (getProperty e "candidate") (null)) (
+    (setProperty (document.getElementById "local-answer") "innerHTML" (encodeSession (getProperty pc2 "localDescription")))
+  ))
+))
+
+(addEventListener pc2 "connection" (handleOnconnection))
+
+(define (writeChat message messageType) (
+  (var (totalSec) (- (/ (Date.getTime) 1000) (* (Date.getTimezoneOffset) 60)))
+  (var (hours) (% (parseInt (/ totalSec 3600)) 24))
+  (var (minutes) (% (parseInt (/ totalSec 60)) 60))
+
+  (var (timestamp) (concatenate
+    (if (< hours 10) (concatenate "0" hours) hours)
+    ":"
+    (if (< minutes 10) (concatenate "0" minutes) minutes)))
+
+  (setProperty (document.getElementById "messages") "innerHTML"
+    (concatenate (getProperty (document.getElementById "messages") "innerHTML")
+     (concatenate "<p class='" messageType "'>" "[" timestamp "] " message "</p>")
+    )
+  )
+))
+
+</script>
+<script src="interpreter.js"></script>
+<script src="main.js"></script>
+</body>
+</html>

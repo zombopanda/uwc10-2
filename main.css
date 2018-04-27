@@ -1,0 +1,46 @@
+#chat {
+    width: 400px;
+}
+
+#chat form {
+    margin-top: 10px;
+}
+
+#chat #message-text {
+    padding: 6px 8px;
+    width: 275px;
+}
+
+#chat #send-message {
+    width: 121px;
+    padding: 6px 0;
+}
+
+#signaling button {
+    margin-top: 7px;
+    margin-right: 20px;
+    padding: 6px 15px;
+}
+
+#messages {
+    border: 1px solid #C7C7C7;
+    height: 238px;
+    padding: 6px 10px;
+}
+
+#messages {
+    height:350px;
+    overflow:auto;
+}
+
+#messages p {
+    margin: 3px 0;
+}
+
+.text-green {
+    color: #238522;
+}
+
+.text-blue {
+    color: #0707FB;
+}
